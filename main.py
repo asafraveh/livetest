@@ -1,240 +1,258 @@
 import tkinter as tk
-from tkinter import ttk
-from openpyxl import load_workbook
-from tkcalendar import Calendar
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
+from openpyxl import load_workbook
+from tkcalendar import Calendar
+import json
 import threading
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
+def open_website_and_login(website_url, username_value, password_value):
+    driver = webdriver.Chrome()
+    driver.get(website_url)
+    wait = WebDriverWait(driver, 10)
+    username_field = wait.until(EC.element_to_be_clickable((By.ID, "username")))
+    username_field.click()
+    username_field.send_keys(username_value)
+    password_field = wait.until(EC.element_to_be_clickable((By.ID, "password")))
+    password_field.click()
+    password_field.send_keys(password_value)
+    login_button = wait.until(EC.element_to_be_clickable((By.ID, "kc-login")))
+    login_button.click()
+    input("Press Enter to close the browser...")
+    driver.quit()
 
-# Function to add data to Excel
-def add_data_to_excel():
-    customer = customer_combobox.get()
-    site = site_combobox.get()
-    date = date_cal.get_date()
-    net = net_entry.get()
-    version = version_entry.get()
-    total_event = total_event_entry.get()
-    false_event = false_event_entry.get()
-    version_bugs = version_bugs_entry.get()
-    unique_id = unique_id_entry.get()
-    excel_file_path = excel_file_path_entry.get()
+def open_website_thread(website_url, username_value, password_value):
+    t = threading.Thread(target=open_website_and_login, args=(website_url, username_value, password_value))
+    t.start()
 
-    try:
-        workbook = load_workbook(excel_file_path)
-        if customer in workbook.sheetnames:
-            sheet = workbook[customer]
-        else:
-            sheet = workbook.create_sheet(customer)
-
-        row = [date, site, net, version, total_event, false_event, version_bugs, unique_id]
-        sheet.append(row)
-
-        # Add the data to the "follow up" sheet
-        follow_up_sheet = workbook["follow up"]
-
-        # Check if the date already exists in the "follow up" sheet
-        date_column = follow_up_sheet["A"]
-        dates = [cell.value for cell in date_column[1:]]  # Skip the header
-        if date in dates:
-            row_index = dates.index(date) + 2  # Add 2 to skip the header and convert to 1-based index
-        else:
-            follow_up_sheet.insert_rows(2)  # Insert a new row at row 2 (adjust as needed)
-            follow_up_sheet.cell(row=2, column=1, value=date)
-            row_index = 2
-
-        # Mark the site column with a "V"
-        site_index = sites.index(site) + 2  # Add 2 to skip the header and convert to 1-based index
-        follow_up_sheet.cell(row=row_index, column=site_index, value="V")
-
-        workbook.save(excel_file_path)
-        result_label.config(text="Data added to Excel successfully.")
-    except Exception as e:
-        result_label.config(text=f"Error adding data to Excel: {str(e)}")
-
-
-# Function to clear all fields
 def clear_fields():
-    # Clear all entry fields
     net_entry.delete(0, tk.END)
     version_entry.delete(0, tk.END)
     total_event_entry.delete(0, tk.END)
     false_event_entry.delete(0, tk.END)
     version_bugs_entry.delete(0, tk.END)
     unique_id_entry.delete(0, tk.END)
-    excel_file_path_entry.delete(0, tk.END)
-    excel_file_path_entry.insert(0, "O:\\QA\\live.xlsx")  # Reset Excel file path
+    calendar.set_date("")  # Clear the calendar date
+
+root = tk.Tk()
+root.title("Website Automation")
+
+# Create a frame for the website buttons
+website_frame = ttk.LabelFrame(root, text="Websites")
+website_frame.pack(padx=10, pady=10, fill="both", expand="yes")
+
+button1 = tk.Button(website_frame, text="CEMEX", command=lambda: open_website_thread(
+    "https://cemex-manager-app.ception.live/",
+    "ceptionuser",
+    "ceptioncemex?"
+))
+button2 = tk.Button(website_frame, text="Shafir", command=lambda: open_website_thread(
+    "https://shapir-manager-app.ception.live/",
+    "ceptionuser",
+    "ceptionshapir!"
+))
+button3 = tk.Button(website_frame, text="Heidelberg", command=lambda: open_website_thread(
+    "https://heidelberg-manager-app.ception.live/",
+    "ceptionuser",
+    "ceptionheidelberg%"
+))
+
+button1.grid(row=0, column=0, padx=5, pady=5)
+button2.grid(row=0, column=1, padx=5, pady=5)
+button3.grid(row=0, column=2, padx=5, pady=5)
+
+# Create a frame for data entry
+data_frame = ttk.LabelFrame(root, text="Data Entry")
+data_frame.pack(padx=10, pady=10, fill="both", expand="yes")
+
+site_options = {
+    "Shafir": ["roller", "Etziyona"],
+    "cemex": ["adhalom", "Gdansk", "Gdania", "golani", "mevocarmel", "modiim", "yvnehe"],
+    "hidenberg": ["London1627",
+         "London1656"]
+}
+
+def update_site_options(event):
+    selected_customer = customer_combo.get()
+    site_combo["values"] = site_options.get(selected_customer, [])
+
+def update_net_version(event):
+    selected_site = site_combo.get()
+    site_data = site_config.get(selected_site, {})
+    net_entry.delete(0, tk.END)
+    net_entry.insert(0, site_data.get("net", ""))
+    version_entry.delete(0, tk.END)
+    version_entry.insert(0, site_data.get("version", ""))
+
+def add_data():
+    customer = customer_combo.get()
+    selected_sites = site_combo.get()
+    selected_sites = selected_sites if isinstance(selected_sites, list) else [selected_sites]
+    date = calendar.get_date()
+    net = net_entry.get()
+    version = version_entry.get()
+    total_event = total_event_entry.get()
+    false_event = false_event_entry.get()
+    version_bugs = version_bugs_entry.get()
+    unique_id = unique_id_entry.get()
+
+    try:
+        workbook = load_workbook("O:\\QA\\live.xlsx")
+        sheet = workbook[customer]
+
+        for site in selected_sites:
+            row_number = sheet.max_row + 1
+
+            sheet.cell(row=row_number, column=1, value=date)
+            sheet.cell(row=row_number, column=2, value=site)
+            sheet.cell(row=row_number, column=3, value=net)
+            sheet.cell(row=row_number, column=4, value=version)
+            sheet.cell(row=row_number, column=5, value=total_event)
+            sheet.cell(row=row_number, column=6, value=false_event)
+            sheet.cell(row=row_number, column=7, value=version_bugs)
+            sheet.cell(row=row_number, column=8, value=unique_id)
 
 
-# Function to open websites and perform login on a separate thread
-def open_website_and_login_threaded(website_url, username_value, password_value):
+        workbook.save("O:\\QA\\live.xlsx")
+        messagebox.showinfo("Success", "Data added to Excel sheet.")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {str(e)}")
+
+with open("site_config.json", "r") as config_file:
+    site_config = json.load(config_file)
+
+customer_label = tk.Label(data_frame, text="Customer:")
+customer_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+
+customer_combo = ttk.Combobox(data_frame, values=["cemex", "Shafir", "hidenberg"])
+customer_combo.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+customer_combo.bind("<<ComboboxSelected>>", update_site_options)
+
+site_label = tk.Label(data_frame, text="Site(s):")
+site_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+
+site_combo = ttk.Combobox(data_frame, values=[], state="readonly", justify="left", height=5)
+site_combo.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+site_combo.set("Select Site(s)")
+site_combo.bind("<<ComboboxSelected>>", update_net_version)
+
+date_label = tk.Label(data_frame, text="Date:")
+date_label.grid(row=2, column=0, padx=5, pady=5, sticky="w")
+
+calendar = Calendar(data_frame)
+calendar.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+net_label = tk.Label(data_frame, text="Net:")
+net_label.grid(row=3, column=0, padx=5, pady=5, sticky="w")
+
+net_entry = tk.Entry(data_frame)
+net_entry.grid(row=3, column=1, padx=5, pady=5, sticky="w")
+
+version_label = tk.Label(data_frame, text="Version:")
+version_label.grid(row=4, column=0, padx=5, pady=5, sticky="w")
+
+version_entry = tk.Entry(data_frame)
+version_entry.grid(row=4, column=1, padx=5, pady=5, sticky="w")
+
+total_event_label = tk.Label(data_frame, text="Total Event:")
+total_event_label.grid(row=5, column=0, padx=5, pady=5, sticky="w")
+
+total_event_entry = tk.Entry(data_frame)
+total_event_entry.grid(row=5, column=1, padx=5, pady=5, sticky="w")
+
+false_event_label = tk.Label(data_frame, text="False Event:")
+false_event_label.grid(row=6, column=0, padx=5, pady=5, sticky="w")
+
+false_event_entry = tk.Entry(data_frame)
+false_event_entry.grid(row=6, column=1, padx=5, pady=5, sticky="w")
+
+version_bugs_label = tk.Label(data_frame, text="Version Bugs:")
+version_bugs_label.grid(row=7, column=0, padx=5, pady=5, sticky="w")
+
+version_bugs_entry = tk.Entry(data_frame)
+version_bugs_entry.grid(row=7, column=1, padx=5, pady=5, sticky="w")
+
+unique_id_label = tk.Label(data_frame, text="Unique ID:")
+unique_id_label.grid(row=8, column=0, padx=5, pady=5, sticky="w")
+
+unique_id_entry = tk.Entry(data_frame)
+unique_id_entry.grid(row=8, column=1, padx=5, pady=5, sticky="w")
+
+add_data_button = tk.Button(data_frame, text="Add Data", command=add_data)
+add_data_button.grid(row=9, column=0, columnspan=2, padx=5, pady=10)
+
+# Clear Button
+clear_button = tk.Button(data_frame, text="Clear", command=clear_fields)
+clear_button.grid(row=9, column=2, padx=5, pady=10)
+
+root.mainloop()
+
+
+def open_website_and_login(website_url, username_value, password_value):
     # Create a new Chrome browser instance
     driver = webdriver.Chrome()
 
-    try:
-        # Open the specified website
-        driver.get(website_url)
+    # Open the specified website
+    driver.get(website_url)
 
-        # Use explicit wait to wait for the username field to be clickable
-        wait = WebDriverWait(driver, 10)
-        username_field = wait.until(EC.element_to_be_clickable((By.ID, "username")))
+    # Use explicit wait to wait for the username field to be clickable
+    wait = WebDriverWait(driver, 10)
+    username_field = wait.until(EC.element_to_be_clickable((By.ID, "username")))
 
-        # Click the username field to focus it
-        username_field.click()
+    # Click the username field to focus it
+    username_field.click()
 
-        # Send keys to the username field
-        username_field.send_keys(username_value)
+    # Send keys to the username field
+    username_field.send_keys(username_value)
 
-        # Similarly, handle the password field and login button
+    # Similarly, handle the password field and login button
 
-        password_field = wait.until(EC.element_to_be_clickable((By.ID, "password")))
-        password_field.click()
-        password_field.send_keys(password_value)
+    password_field = wait.until(EC.element_to_be_clickable((By.ID, "password")))
+    password_field.click()
+    password_field.send_keys(password_value)
 
-        login_button = wait.until(EC.element_to_be_clickable((By.ID, "kc-login")))
-        login_button.click()
+    login_button = wait.until(EC.element_to_be_clickable((By.ID, "kc-login")))
+    login_button.click()
 
-        # Wait for user confirmation before closing the browser
-        input("Press Enter to close the browser...")
-    except Exception as e:
-        print(f"Error: {str(e)}")
-    finally:
-        driver.quit()  # Close the browser in all cases
-
-
-# Function to open the CEMEX website and perform login on a separate thread
-def open_cemex_website_threaded():
-    threading.Thread(target=open_website_and_login_threaded, args=(
-        "https://cemex-manager-app.ception.live/",
-        "ceptionuser",
-        "ceptioncemex?"
-    )).start()
-
-
-# Function to open the Shafir website and perform login on a separate thread
-def open_shafir_website_threaded():
-    threading.Thread(target=open_website_and_login_threaded, args=(
-        "https://shapir-manager-app.ception.live/",
-        "ceptionuser",
-        "ceptionshapir!"
-    )).start()
-
-
-# Function to open the Heidelberg website and perform login on a separate thread
-def open_heidelberg_website_threaded():
-    threading.Thread(target=open_website_and_login_threaded, args=(
-        "https://heidelberg-manager-app.ception.live/",
-        "ceptionuser",
-        "ceptionheidelberg%"
-    )).start()
+    # Wait for user confirmation before closing the browser
+    input("Press Enter to close the browser...")
+    driver.quit()  # Close the browser when the user presses Enter
 
 
 # Create the main window
-root = tk.Tk()
-root.title("Excel Data Entry and Website Automation")
+#root = tk.Tk()
+#root.title("Website Automation")
 
-# Create and configure the frame
-frame = ttk.Frame(root, padding=10)
-frame.grid(column=0, row=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-frame.columnconfigure(1, weight=1)
+# Create buttons
+#button1 = tk.Button(root, text="CEMEX", command=lambda: open_website_and_login(
+ #   "https://cemex-manager-app.ception.live/",
+  #  "ceptionuser",
+  #  "ceptioncemex?"
+#))
+#button2 = tk.Button(root, text="Shafir", command=lambda: open_website_and_login(
+#    "https://shapir-manager-app.ception.live/",
+#    "ceptionuser",
+#   "ceptionshapir!"
+#)
+#button3 = tk.Button(root, text="Heidelberg", command=lambda: open_website_and_login(
+#    "https://heidelberg-manager-app.ception.live/",
+#    "ceptionuser",
+#    "ceptionheidelberg%"
+#))
 
-# Customer selection
-customer_label = ttk.Label(frame, text="Customer:")
-customer_label.grid(column=0, row=0, sticky=tk.W)
-customer_combobox = ttk.Combobox(frame, values=["cemex", "Shafir", "hidenberg"])
-customer_combobox.grid(column=1, row=0, sticky=tk.W)
+# Pack buttons into the main window
+#button1.pack()
+#button2.pack()
+#button3.pack()
 
-# Site selection
-site_label = ttk.Label(frame, text="Site:")
-site_label.grid(column=0, row=1, sticky=tk.W)
-sites = ["adhalom", "Gdansk", "Gdynia", "golani", "mevocarmel", "modiim", "yvnehe", "roller", "Etziyona", "London1627",
-         "London1656"]
-site_combobox = ttk.Combobox(frame, values=[])
-site_combobox.grid(column=1, row=1, sticky=tk.W)
-# Update site choices based on customer selection
-def update_site_choices(event):
-    selected_customer = customer_combobox.get()
-
-    # Define site choices based on the selected customer
-    if selected_customer == "Shafir":
-        site_combobox['values'] = ["roller", "Etziyona"]
-    elif selected_customer == "cemex":
-        site_combobox['values'] = ["adhalom", "Gdansk", "Gdynia", "golani", "mevocarmel", "modiim", "yvnehe"]
-    elif selected_customer == "hidenberg":
-        site_combobox['values'] = ["London1627", "London1656"]
-    else:
-        site_combobox['values'] = []
-
-
-# Bind the update_site_choices function to the Combobox selection event
-customer_combobox.bind("<<ComboboxSelected>>", update_site_choices)
-
-# Date entry
-date_label = ttk.Label(frame, text="Date:")
-date_label.grid(column=0, row=2, sticky=tk.W)
-date_cal = Calendar(frame)
-date_cal.grid(column=1, row=2, sticky=tk.W)
-
-# Other fields (net, version, total event, false event, version bugs, unique id)
-net_label = ttk.Label(frame, text="Net:")
-net_label.grid(column=0, row=3, sticky=tk.W)
-net_entry = ttk.Entry(frame)
-net_entry.grid(column=1, row=3, sticky=tk.W)
-
-version_label = ttk.Label(frame, text="Version:")
-version_label.grid(column=0, row=4, sticky=tk.W)
-version_entry = ttk.Entry(frame)
-version_entry.grid(column=1, row=4, sticky=tk.W)
-
-total_event_label = ttk.Label(frame, text="Total Event:")
-total_event_label.grid(column=0, row=5, sticky=tk.W)
-total_event_entry = ttk.Entry(frame)
-total_event_entry.grid(column=1, row=5, sticky=tk.W)
-
-false_event_label = ttk.Label(frame, text="False Event:")
-false_event_label.grid(column=0, row=6, sticky=tk.W)
-false_event_entry = ttk.Entry(frame)
-false_event_entry.grid(column=1, row=6, sticky=tk.W)
-
-version_bugs_label = ttk.Label(frame, text="Version Bugs:")
-version_bugs_label.grid(column=0, row=7, sticky=tk.W)
-version_bugs_entry = ttk.Entry(frame)
-version_bugs_entry.grid(column=1, row=7, sticky=tk.W)
-
-unique_id_label = ttk.Label(frame, text="Unique ID:")
-unique_id_label.grid(column=0, row=8, sticky=tk.W)
-unique_id_entry = ttk.Entry(frame)
-unique_id_entry.grid(column=1, row=8, sticky=tk.W)
-
-# Excel file path entry
-excel_file_path_label = ttk.Label(frame, text="Excel File Path:")
-excel_file_path_label.grid(column=0, row=9, sticky=tk.W)
-excel_file_path_entry = ttk.Entry(frame)
-excel_file_path_entry.grid(column=1, row=9, sticky=(tk.W, tk.E))
-excel_file_path_entry.insert(0, "O:\\QA\\live.xlsx")
-
-# Add data button
-add_data_button = ttk.Button(frame, text="Add to Excel", command=add_data_to_excel)
-add_data_button.grid(column=1, row=10, sticky=tk.E)
-
-# Clear button
-clear_button = ttk.Button(frame, text="Clear", command=clear_fields)
-clear_button.grid(column=0, row=10, sticky=tk.W)
-
-# Result label
-result_label = ttk.Label(frame, text="")
-result_label.grid(column=0, row=11, columnspan=2)
-
-# Create buttons for website automation
-cemex_button = ttk.Button(frame, text="CEMEX Website", command=open_cemex_website_threaded)
-shafir_button = ttk.Button(frame, text="Shafir Website", command=open_shafir_website_threaded)
-heidelberg_button = ttk.Button(frame, text="Heidelberg Website", command=open_heidelberg_website_threaded)
-
-# Place website automation buttons in the frame
-cemex_button.grid(column=0, row=12, sticky=tk.W)
-shafir_button.grid(column=1, row=12, sticky=tk.W)
-heidelberg_button.grid(column=2, row=12, sticky=tk.W)
-
-root.mainloop()
+# Start the GUI main loop
+#root.mainloop()
