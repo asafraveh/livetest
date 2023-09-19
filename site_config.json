@@ -32,8 +32,8 @@
         "version": "06.101-2.8.53"
     },
     "mevocarmel": {
-        "net": "Net_Mevocarmel",
-        "version": "Version_Mevocarmel"
+        "net": "0.5.2",
+        "version": "06.101-2.8.5"
     },
     "London1627": {
         "net": "0.5.7",
